@@ -305,8 +305,8 @@ Contributions, issues, and feature requests are welcome!
 
 **[Your Name]**
 
-* GitHub: [@yourusername](https://github.com/Nihar2520)
-* LinkedIn: [Your LinkedIn](https://www.linkedin.com/in/nihar-mehta-247339227/)
+* GitHub: [@nihar](https://github.com/Nihar2520)
+* LinkedIn: [Nihar](https://www.linkedin.com/in/nihar-mehta-247339227/)
 
 ---
 
