@@ -1,0 +1,150 @@
+{
+  "name": "Autosecflow-mini soar",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "security-alert",
+        "responseMode": "streaming",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [-112, 64],
+      "id": "39d67708-9b76-4dc2-b737-df938d65a2b5",
+      "name": "Webhook"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.abuseipdb.com/api/v2/check?ipAddress={{$json[\"body\"][\"ip\"]}}&maxAgeInDays=90",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Key",
+              "value": "YOUR_ABUSEIPDB_API_KEY"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [288, 0],
+      "id": "b0659f67-e92d-40ad-bdcb-b9e088ce28e1",
+      "name": "AbuseIPDB HTTP Request"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://www.virustotal.com/api/v3/ip_addresses/{{$json['body']['ip']}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-apikey",
+              "value": "YOUR_VIRUSTOTAL_API_KEY"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [288, 208],
+      "id": "0a744857-0a30-42b4-9ff7-d9bd581f3254",
+      "name": "VirusTotal HTTP Request"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [624, 96],
+      "id": "cdeb51f0-795f-46d1-8f8c-fc71b7775729",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $items();\n\nlet vtData = null;\nlet abuseData = null;\n\nfor (const item of items) {\n  if (item.json.data?.attributes) {\n    vtData = item.json;\n  } else if (item.json.data?.abuseConfidenceScore !== undefined) {\n    abuseData = item.json;\n  }\n}\n\nconst vtMalicious = vtData?.data?.attributes?.last_analysis_stats?.malicious || 0;\nconst abuseScore = abuseData?.data?.abuseConfidenceScore || 0;\n\nconst ip = abuseData?.data?.ipAddress || vtData?.data?.id || \"unknown\";\n\nlet risk = \"low\";\n\nif (vtMalicious >= 5 || abuseScore >= 70) {\n  risk = \"high\";\n} else if (vtMalicious >= 1 || abuseScore >= 30) {\n  risk = \"medium\";\n}\n\nreturn [{ ip, vtMalicious, abuseScore, risk }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [832, 64],
+      "id": "9adffd0e-b09b-4008-8e4b-df80dd299e3c",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{$json[\"risk\"]}}",
+              "rightValue": "high",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [1040, 96],
+      "id": "37de7bac-727e-482c-9180-35eb3f1e0a86",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://httpbin.org/post",
+        "sendBody": true,
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "={\"action\":\"block\",\"ip\":\"{{$json.ip}}\",\"risk\":\"{{$json.risk}}\",\"timestamp\":\"{{$now}}\"}"
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1360, 224],
+      "id": "316b6d24-0a9a-4e99-9383-7caa6084801a",
+      "name": "Simulated Firewall Block"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          { "node": "AbuseIPDB HTTP Request", "type": "main", "index": 0 },
+          { "node": "VirusTotal HTTP Request", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "AbuseIPDB HTTP Request": {
+      "main": [[{ "node": "Merge", "type": "main", "index": 0 }]]
+    },
+    "VirusTotal HTTP Request": {
+      "main": [[{ "node": "Merge", "type": "main", "index": 1 }]]
+    },
+    "Merge": {
+      "main": [[{ "node": "Code in JavaScript", "type": "main", "index": 0 }]]
+    },
+    "Code in JavaScript": {
+      "main": [[{ "node": "If", "type": "main", "index": 0 }]]
+    },
+    "If": {
+      "main": [
+        [{ "node": "Simulated Firewall Block", "type": "main", "index": 0 }],
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
